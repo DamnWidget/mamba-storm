@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 import os
 import re
+import sys
 
-import ez_setup
-ez_setup.use_setuptools()
+PYTHON3 = True if sys.version_info >= (3, 0) else False
+
+if not PYTHON3:
+    import ez_setup
+    ez_setup.use_setuptools()
 
 from setuptools import setup, Extension, find_packages
 
