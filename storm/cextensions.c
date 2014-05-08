@@ -30,6 +30,17 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
+/*
+    Mamba Support for Python 3
+
+    In Python3, ob_type is in a nested structure so self->ob_type doesn't
+    work aymore so we have to use the PyTYPE macro but it doesn't exists
+    previous to Python 2.6 so we define it if i not defined yet
+*/
+#ifndef PyType
+    #define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#endif
+
 
 #define CATCH(error_value, expression) \
         do { \
@@ -300,7 +311,7 @@ static void
 EventSystem_dealloc(EventSystemObject *self)
 {
     EventSystem_clear(self);
-    self->ob_type->tp_free((PyObject *)self);
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -521,9 +532,14 @@ static PyMemberDef EventSystem_members[] = {
 };
 #undef OFFSETOF
 
+#if PY_MAJOR_VERSION >= 3
+static PyTypeObject EventSystem_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+#else
 statichere PyTypeObject EventSystem_Type = {
     PyObject_HEAD_INIT(NULL)
     0,            /*ob_size*/
+#endif
     "storm.variables.EventSystem",    /*tp_name*/
     sizeof(EventSystemObject), /*tp_basicsize*/
     0,            /*tp_itemsize*/
@@ -707,7 +723,7 @@ static void
 Variable_dealloc(VariableObject *self)
 {
     Variable_clear(self);
-    self->ob_type->tp_free((PyObject *)self);
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -1065,7 +1081,7 @@ Variable_copy(VariableObject *self, PyObject *args)
 
     /* variable = self.__class__.__new__(self.__class__) */
     noargs = PyTuple_New(0);
-    CATCH(NULL, variable = self->ob_type->tp_new(self->ob_type, noargs, NULL));
+    CATCH(NULL, variable = Py_TYPE(self)->tp_new(Py_TYPE(self), noargs, NULL));
 
     /* variable.set_state(self.get_state()) */
     CATCH(NULL,
@@ -1116,9 +1132,14 @@ static PyMemberDef Variable_members[] = {
 };
 #undef OFFSETOF
 
+#if PY_MAJOR_VERSION >= 3
+static PyTypeObject Variable_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)  /*ob_size*/
+#else
 statichere PyTypeObject Variable_Type = {
     PyObject_HEAD_INIT(NULL)
     0,            /*ob_size*/
+#endif
     "storm.variables.Variable",    /*tp_name*/
     sizeof(VariableObject), /*tp_basicsize*/
     0,            /*tp_itemsize*/
@@ -1267,7 +1288,7 @@ static void
 Compile_dealloc(CompileObject *self)
 {
     Compile_clear(self);
-    self->ob_type->tp_free((PyObject *)self);
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -1434,13 +1455,17 @@ error:
     return NULL;
 }
 
+#if PY_MAJOR_VERSION >= 3
+static PyTypeObject Compile_Type;
+#else
 staticforward PyTypeObject Compile_Type;
+#endif
 
 static PyObject *
 Compile_create_child(CompileObject *self, PyObject *args)
 {
     /* return self.__class__(self) */
-    return PyObject_CallFunctionObjArgs((PyObject *)self->ob_type, self, NULL);
+    return PyObject_CallFunctionObjArgs((PyObject*)Py_TYPE(self), self, NULL);
 }
 
 static PyObject *
@@ -1450,7 +1475,11 @@ Compile_get_precedence(CompileObject *self, PyObject *type)
     PyObject *result = PyDict_GetItem(self->_precedence, type);
     if (result == NULL && !PyErr_Occurred()) {
         /* That should be MAX_PRECEDENCE, defined in expr.py */
+#if PY_MAJOR_VERSION >= 3
+        return PyLong_FromLong(1000);
+#else
         return PyInt_FromLong(1000);
+#endif
     }
     Py_INCREF(result);
     return result;
@@ -1495,7 +1524,7 @@ Compile_single(CompileObject *self,
     PyObject *statement = NULL;
 
     /* cls = expr.__class__ */
-    PyObject *cls = (PyObject *)expr->ob_type;
+    PyObject *cls = (PyObject*)Py_TYPE(expr);
 
     /*
        dispatch_table = self._dispatch_table
@@ -1512,7 +1541,7 @@ Compile_single(CompileObject *self,
             goto error;
 
         /* for mro_cls in cls.__mro__: */
-        mro = expr->ob_type->tp_mro;
+        mro = Py_TYPE(expr)->tp_mro;
         size = PyTuple_GET_SIZE(mro);
         for (i = 0; i != size; i++) {
             PyObject *mro_cls = PyTuple_GET_ITEM(mro, i);
@@ -1538,7 +1567,11 @@ Compile_single(CompileObject *self,
             if (repr) {
                 PyErr_Format(CompileError,
                              "Don't know how to compile type %s of %s",
-                             expr->ob_type->tp_name, PyString_AS_STRING(repr));
+#if PY_MAJOR_VERSION >= 3
+                             Py_TYPE(expr)->tp_name, PyBytes_AS_STRING(repr));
+#else
+                             Py_TYPE(expr)->tp_name, PyString_AS_STRING(repr));
+#endif
                 Py_DECREF(repr);
             }
             goto error;
@@ -1557,7 +1590,12 @@ Compile_single(CompileObject *self,
                                                          state, NULL));
 
     /* if inner_precedence < outer_precedence: */
+#if PY_MAJOR_VERSION >= 3
+    PyObject* result = PyObject_RichCompare(inner_precedence, outer_precedence, Py_LT);
+    if (result == Py_True) {
+#else
     if (PyObject_Compare(inner_precedence, outer_precedence) == -1) {
+#endif
         PyObject *args, *tmp;
 
         if (PyErr_Occurred())
@@ -1601,8 +1639,12 @@ Compile_one_or_many(CompileObject *self, PyObject *expr, PyObject *state,
           raw and (expr_type is str or expr_type is unicode)):
           return expr
     */
-    if ((PyObject *)expr->ob_type == SQLRaw ||
+    if ((PyObject*)Py_TYPE(expr) == SQLRaw ||
+#if PY_MAJOR_VERSION >= 3
+        (raw && (PyBytes_CheckExact(expr) || PyUnicode_CheckExact(expr)))) {
+#else
         (raw && (PyString_CheckExact(expr) || PyUnicode_CheckExact(expr)))) {
+#endif
         /* Pass our reference on. */
         return expr;
     }
@@ -1611,7 +1653,11 @@ Compile_one_or_many(CompileObject *self, PyObject *expr, PyObject *state,
        if token and (expr_type is str or expr_type is unicode):
            expr = SQLToken(expr)
     */
+#if PY_MAJOR_VERSION >= 3
+    if (token && (PyBytes_CheckExact(expr) || PyUnicode_CheckExact(expr))) {
+#else
     if (token && (PyString_CheckExact(expr) || PyUnicode_CheckExact(expr))) {
+#endif
         PyObject *tmp;
         CATCH(NULL, tmp = PyObject_CallFunctionObjArgs(SQLToken, expr, NULL));
         Py_DECREF(expr);
@@ -1641,8 +1687,12 @@ Compile_one_or_many(CompileObject *self, PyObject *expr, PyObject *state,
                if subexpr_type is SQLRaw or raw and (subexpr_type is str or
                                                      subexpr_type is unicode):
             */
-            if ((PyObject *)subexpr->ob_type == (PyObject *)SQLRaw ||
+            if ((PyObject*)Py_TYPE(subexpr) == (PyObject*)SQLRaw ||
+#if PY_MAJOR_VERSION >= 3
+                (raw && (PyBytes_CheckExact(subexpr) ||
+#else
                 (raw && (PyString_CheckExact(subexpr) ||
+#endif
                          PyUnicode_CheckExact(subexpr)))) {
                 /* statement = subexpr */
                 Py_INCREF(subexpr);
@@ -1664,7 +1714,11 @@ Compile_one_or_many(CompileObject *self, PyObject *expr, PyObject *state,
                                  subexpr_type is str):
                 */
                 if (token && (PyUnicode_CheckExact(subexpr) ||
+#if PY_MAJOR_VERSION >= 3
+                              PyBytes_CheckExact(subexpr))) {
+#else
                               PyString_CheckExact(subexpr))) {
+#endif
                     /* subexpr = SQLToken(subexpr) */
                     CATCH(NULL,
                           subexpr = PyObject_CallFunctionObjArgs(SQLToken,
@@ -1780,9 +1834,14 @@ static PyMemberDef Compile_members[] = {
 };
 #undef OFFSETOF
 
+#if PY_MAJOR_VERSION >= 3
+static PyTypeObject Compile_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)  /*ob_size*/
+#else
 statichere PyTypeObject Compile_Type = {
     PyObject_HEAD_INIT(NULL)
     0,            /*ob_size*/
+#endif
     "storm.variables.Compile",    /*tp_name*/
     sizeof(CompileObject), /*tp_basicsize*/
     0,            /*tp_itemsize*/
@@ -1858,7 +1917,7 @@ ObjectInfo_init(ObjectInfoObject *self, PyObject *args)
 
     /* self.cls_info = get_cls_info(type(obj)) */
     CATCH(NULL, self->cls_info = PyObject_CallFunctionObjArgs(get_cls_info,
-                                                              obj->ob_type,
+                                                              Py_TYPE(obj),
                                                               NULL));
 
     /* self.set_obj(obj) */
@@ -2071,9 +2130,14 @@ static PyGetSetDef ObjectInfo_getset[] = {
     {NULL}
 };
 
+#if PY_MAJOR_VERSION >= 3
+static PyTypeObject ObjectInfo_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)     /*ob_size*/
+#else
 statichere PyTypeObject ObjectInfo_Type = {
     PyObject_HEAD_INIT(NULL)
     0,            /*ob_size*/
+#endif
     "storm.info.ObjectInfo", /*tp_name*/
     sizeof(ObjectInfoObject), /*tp_basicsize*/
     0,            /*tp_itemsize*/
@@ -2121,7 +2185,7 @@ get_obj_info(PyObject *self, PyObject *obj)
 {
     PyObject *obj_info;
 
-    if (obj->ob_type == &ObjectInfo_Type) {
+    if (Py_TYPE(obj) == &ObjectInfo_Type) {
         /* Much better than asking the ObjectInfo to return itself. ;-) */
         Py_INCREF(obj);
         return obj;
@@ -2176,8 +2240,12 @@ prepare_type(PyTypeObject *type)
     return PyType_Ready(type);
 }
 
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC PyInit_cextensions(void)
+#else
 DL_EXPORT(void)
 initcextensions(void)
+#endif
 {
     PyObject *module;
 
@@ -2188,7 +2256,22 @@ initcextensions(void)
     prepare_type(&ObjectInfo_Type);
     prepare_type(&Variable_Type);
 
+#if PY_MAJOR_VERSION >= 3
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "cextension",        /* m_name */
+        "",                  /* m_doc */
+        -1,                  /* m_size */
+        cextensions_methods, /* m_methods */
+        NULL,                /* m_reload */
+        NULL,                /* m_traverse */
+        NULL,                /* m_clear */
+        NULL,                /* m_free */
+    };
+    module = PyModule_Create(&moduledef);
+#else
     module = Py_InitModule3("cextensions", cextensions_methods, "");
+#endif
     Py_INCREF(&Variable_Type);
 
 #define REGISTER_TYPE(name) \
@@ -2201,6 +2284,10 @@ initcextensions(void)
     REGISTER_TYPE(ObjectInfo);
     REGISTER_TYPE(Compile);
     REGISTER_TYPE(EventSystem);
+
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
 }
 
 /* vim:ts=4:sw=4:et
