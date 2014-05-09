@@ -236,7 +236,7 @@ class ZStormResourceManagerTest(TestHelper):
         real_invalidate = store.invalidate
 
         def invalidate_proxy():
-            self.assertEqual(0, len(store._alive.values()))
+            self.assertEqual(0, len(list(store._alive.values())))
             real_invalidate()
         store.invalidate = invalidate_proxy
 

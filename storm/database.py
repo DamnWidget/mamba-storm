@@ -1,3 +1,14 @@
+
+# Copyright (c) 2014 Oscar Campos <oscar.campos@member.fsf.org>
+# See LICENSE for more details
+
+"""
+.. module:: expr
+    :synopsis: Storm database abstraction
+
+.. moduleauthor:: Oscar Campos <oscar.campos@member.fsf.org>
+"""
+
 #
 # Copyright (c) 2006, 2007 Canonical
 #
@@ -36,6 +47,9 @@ from storm.exceptions import (
 from storm.uri import URI
 import storm
 
+# Python 3 compatibility layer
+import six
+
 
 __all__ = ["Database", "Connection", "Result",
            "convert_param_marks", "create_database", "register_scheme"]
@@ -52,7 +66,7 @@ class Result(object):
     _closed = False
 
     def __init__(self, connection, raw_cursor):
-        self._connection = connection # Ensures deallocation order.
+        self._connection = connection  # Ensures deallocation order.
         self._raw_cursor = raw_cursor
         if raw_cursor.arraysize == 1:
             # Default of 1 is silly.
@@ -318,7 +332,7 @@ class Connection(object):
                         self._raw_connection.tpc_rollback()
                     else:
                         self._raw_connection.rollback()
-                except Error, exc:
+                except Error as exc:
                     if self.is_disconnection_error(exc):
                         self._raw_connection = None
                         self._state = STATE_RECONNECT
@@ -386,7 +400,7 @@ class Connection(object):
         """Complete the statement execution, along with result reports."""
         try:
             self._check_disconnect(raw_cursor.execute, *args)
-        except Exception, error:
+        except Exception as error:
             self._check_disconnect(
                 trace, "connection_raw_execute_error", self, raw_cursor,
                 statement, params or (), error)
@@ -402,7 +416,7 @@ class Connection(object):
             self._check_disconnect(
                 trace, "connection_raw_execute", self, raw_cursor,
                 statement, params or ())
-        except Exception, error:
+        except Exception as error:
             self._check_disconnect(
                 trace, "connection_raw_execute_error", self, raw_cursor,
                 statement, params or (), error)
@@ -423,7 +437,7 @@ class Connection(object):
         elif self._state == STATE_RECONNECT:
             try:
                 self._raw_connection = self._database.raw_connect()
-            except DatabaseError, exc:
+            except DatabaseError as exc:
                 self._state = STATE_DISCONNECTED
                 self._raw_connection = None
                 raise DisconnectionError(str(exc))
@@ -452,7 +466,7 @@ class Connection(object):
             'extra_disconnection_errors', ())
         try:
             return function(*args, **kwargs)
-        except Exception, exc:
+        except Exception as exc:
             if self.is_disconnection_error(exc, extra_disconnection_errors):
                 self._state = STATE_DISCONNECTED
                 self._raw_connection = None
@@ -537,7 +551,7 @@ def create_database(uri):
         - "anything:..." Where 'anything' has previously been registered
           with L{register_scheme}.
     """
-    if isinstance(uri, basestring):
+    if isinstance(uri, six.string_types):
         uri = URI(uri)
     if uri.scheme in _database_schemes:
         factory = _database_schemes[uri.scheme]

@@ -18,7 +18,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from cStringIO import StringIO
+
+
+from six.moves import cStringIO as StringIO
 import tempfile
 import logging
 import shutil

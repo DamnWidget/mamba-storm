@@ -18,6 +18,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# Python 3 compatibility layer
+import six
+
 from bisect import insort_left, bisect_left
 import weakref
 import sys
@@ -59,21 +63,29 @@ class Property(object):
             # (might be proxied or whatever).
             cls = obj_info.cls_info.cls
         column = self._get_column(cls)
-        return obj_info.variables[column].get()
+        if six.PY2:
+            return obj_info.variables[column].get()
+        return obj_info.variables[id(column)].get()
 
     def __set__(self, obj, value):
         obj_info = get_obj_info(obj)
         # Don't get obj.__class__ because we don't trust it
         # (might be proxied or whatever).
         column = self._get_column(obj_info.cls_info.cls)
-        obj_info.variables[column].set(value)
+        if six.PY2:
+            obj_info.variables[column].set(value)
+        else:
+            obj_info.variables[id(column)].set(value)
 
     def __delete__(self, obj):
         obj_info = get_obj_info(obj)
         # Don't get obj.__class__ because we don't trust it
         # (might be proxied or whatever).
         column = self._get_column(obj_info.cls_info.cls)
-        obj_info.variables[column].delete()
+        if six.PY2:
+            obj_info.variables[column].delete()
+        else:
+            obj_info.variables[id(column)].delete()
 
     def _detect_attr_name(self, used_cls):
         self_id = id(self)

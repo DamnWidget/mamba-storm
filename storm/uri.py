@@ -1,3 +1,14 @@
+
+# Copyright (c) 2014 Oscar Campos <oscar.campos@member.fsf.org>
+# See LICENSE for more details
+
+"""
+.. module:: uri
+    :synopsis: Storm URI
+
+.. moduleauthor:: Oscar Campos <oscar.campos@member.fsf.org>
+"""
+
 #
 # Copyright (c) 2006, 2007 Canonical
 #
@@ -18,7 +29,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from urllib import quote
+
+from six.moves.urllib.parse import quote
 
 from storm.exceptions import URIError
 

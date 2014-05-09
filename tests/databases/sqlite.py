@@ -34,7 +34,7 @@ from tests.helper import TestHelper, MakePath
 class SQLiteMemoryTest(DatabaseTest, TestHelper):
 
     helpers = [MakePath]
-    
+
     def get_path(self):
         return ""
 
@@ -114,7 +114,7 @@ class SQLiteFileTest(SQLiteMemoryTest):
         started = time.time()
         try:
             connection2.execute("INSERT INTO test VALUES (2)")
-        except OperationalError, exception:
+        except OperationalError as exception:
             self.assertEquals(str(exception), "database is locked")
             self.assertTrue(time.time()-started >= 0.3)
         else:
@@ -122,7 +122,7 @@ class SQLiteFileTest(SQLiteMemoryTest):
 
     def test_commit_timeout(self):
         """Regression test for commit observing the timeout.
-        
+
         In 0.10, the timeout wasn't observed for connection.commit().
 
         """
@@ -141,7 +141,7 @@ class SQLiteFileTest(SQLiteMemoryTest):
         started = time.time()
         try:
             connection1.commit()
-        except OperationalError, exception:
+        except OperationalError as exception:
             self.assertEquals(str(exception), "database is locked")
             # In 0.10, the next assertion failed because the timeout wasn't
             # enforced for the "COMMIT" statement.
@@ -151,7 +151,7 @@ class SQLiteFileTest(SQLiteMemoryTest):
 
     def test_recover_after_timeout(self):
         """Regression test for recovering from database locked exception.
-        
+
         In 0.10, connection.commit() would forget that a transaction was in
         progress if an exception was raised, such as an OperationalError due to
         another connection being open.  As a result, a subsequent modification
@@ -233,6 +233,6 @@ class SQLiteFileTest(SQLiteMemoryTest):
                               foreign_keys_values[value])
 
 class SQLiteUnsupportedTest(UnsupportedDatabaseTest, TestHelper):
- 
+
     dbapi_module_names = ["pysqlite2", "sqlite3"]
     db_module_name = "sqlite"

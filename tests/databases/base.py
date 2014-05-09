@@ -20,26 +20,27 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime, date, time, timedelta
-import cPickle as pickle
-import shutil
-import sys
+
 import os
+import sys
+import shutil
+import pickle
+from datetime import datetime, date, time, timedelta
+
 
 from storm.uri import URI
-from storm.expr import Select, Column, SQLToken, SQLRaw, Count, Alias
-from storm.variables import (Variable, PickleVariable, RawStrVariable,
-                             DecimalVariable, DateTimeVariable, DateVariable,
-                             TimeVariable, TimeDeltaVariable)
-from storm.database import *
 from storm.xid import Xid
+from storm.database import *
+from tests.helper import MakePath
 from storm.event import EventSystem
+from tests.databases.proxy import ProxyTCPServer
+from storm.expr import Select, Column, SQLToken, SQLRaw, Count, Alias
 from storm.exceptions import (
     DatabaseError, DatabaseModuleError, ConnectionBlockedError,
     DisconnectionError, Error, OperationalError, ProgrammingError)
-
-from tests.databases.proxy import ProxyTCPServer
-from tests.helper import MakePath
+from storm.variables import (Variable, PickleVariable, RawStrVariable,
+                             DecimalVariable, DateTimeVariable, DateVariable,
+                             TimeVariable, TimeDeltaVariable)
 
 
 class Marker(object):
@@ -339,7 +340,7 @@ class DatabaseTest(object):
                 connection2.execute("UPDATE test SET title='Title 100' "
                                     "WHERE id=10")
                 connection2.commit()
-            except OperationalError, e:
+            except OperationalError as e:
                 self.assertEquals(str(e), "database is locked") # SQLite blocks
             result = connection1.execute("SELECT title FROM test WHERE id=10")
             self.assertEquals(result.get_one(), ("Title 10",))
@@ -765,7 +766,7 @@ class DatabaseDisconnectionTest(DatabaseDisconnectionMixin):
             cursor = self.connection._raw_connection.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
-        except Error, exc:
+        except Error as exc:
             self.assertTrue(self.connection.is_disconnection_error(exc))
         else:
             self.fail("Disconnection was not caught.")
@@ -774,7 +775,7 @@ class DatabaseDisconnectionTest(DatabaseDisconnectionMixin):
         # error when called.
         try:
             self.connection._raw_connection.rollback()
-        except Error, exc:
+        except Error as exc:
             self.assertTrue(self.connection.is_disconnection_error(exc))
         else:
             self.fail("Disconnection was not raised.")
@@ -798,7 +799,7 @@ class DatabaseDisconnectionTest(DatabaseDisconnectionMixin):
             cursor = self.connection._raw_connection.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
-        except DatabaseError, exc:
+        except DatabaseError as exc:
             self.assertTrue(self.connection.is_disconnection_error(exc))
         else:
             self.fail("Disconnection was not caught.")

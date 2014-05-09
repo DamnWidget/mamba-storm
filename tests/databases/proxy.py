@@ -23,7 +23,7 @@
 import os
 import select
 import socket
-import SocketServer
+from six.moves import socketserver as SocketServer
 import threading
 
 

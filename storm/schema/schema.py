@@ -74,7 +74,7 @@ class Schema(object):
             try:
                 store.execute(statement)
             except Exception:
-                print "Error running %s" % statement
+                print("Error running %s" % statement)
                 raise
         if self._autocommit:
             store.commit()

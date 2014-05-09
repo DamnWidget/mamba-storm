@@ -1,3 +1,14 @@
+
+# Copyright (c) 2014 Oscar Campos <oscar.campos@member.fsf.org>
+# See LICENSE for more details
+
+"""
+.. module:: expr
+    :synopsis: Storm expressions
+
+.. moduleauthor:: Oscar Campos <oscar.campos@member.fsf.org>
+"""
+
 #
 # Copyright (c) 2006, 2007 Canonical
 #
@@ -18,22 +29,29 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from decimal import Decimal
-from datetime import datetime, date, time, timedelta
-from weakref import WeakKeyDictionary
-from copy import copy
-import re
 
+# Python 3 compatibility layer
+import six
+if six.PY3:
+    unicode = str
+    long = int
+
+import re
+from copy import copy
+from decimal import Decimal
+from weakref import WeakKeyDictionary
+from datetime import datetime, date, time, timedelta
+
+from storm import Undef, has_cextensions
 from storm.exceptions import CompileError, NoTableError, ExprError
 from storm.variables import (
     Variable, RawStrVariable, UnicodeVariable, LazyValue,
     DateTimeVariable, DateVariable, TimeVariable, TimeDeltaVariable,
     BoolVariable, IntVariable, FloatVariable, DecimalVariable)
-from storm import Undef, has_cextensions
-
 
 # --------------------------------------------------------------------
 # Basic compiler infrastructure
+
 
 def _when(self, types):
     """Check Compile.when.  Defined here to ease the work of cextensions."""
@@ -216,7 +234,8 @@ class CompilePython(Compile):
                 "    return match" %
                 (",".join("_%d" % i for i in range(len(state.parameters))),
                  source))
-        exec code in namespace
+
+        six.exec_(code, namespace)
         return namespace['closure'](state.parameters, bool)
 
 
@@ -730,13 +749,19 @@ class Insert(Expr):
 @compile.when(Insert)
 def compile_insert(compile, insert, state):
     state.push("context", COLUMN_NAME)
-    columns = compile(tuple(insert.map), state, token=True)
+    if six.PY2:
+        columns = compile(tuple(insert.map), state, token=True)
+    else:
+        columns = compile(
+            tuple([p.column for p in insert.map.values()]),
+            state, token=True
+        )
     state.context = TABLE
     table = build_tables(compile, insert.table, insert.default_table, state)
     state.context = EXPR
     values = insert.values
     if values is Undef:
-        values = [tuple(insert.map.itervalues())]
+        values = [tuple(six.itervalues(insert.map))]
     if isinstance(values, Expr):
         compiled_values = compile(values, state)
     else:
@@ -763,9 +788,15 @@ class Update(Expr):
 def compile_update(compile, update, state):
     map = update.map
     state.push("context", COLUMN_NAME)
-    sets = ["%s=%s" % (compile(col, state, token=True),
-                       compile(map[col], state))
-            for col in map]
+    if six.PY2:
+        sets = ["%s=%s" % (compile(col, state, token=True),
+                           compile(map[col], state))
+                for col in map]
+    else:
+        sets = ["%s=%s" % (compile(cal.column, state, token=True),
+                           compile(cal, state))
+                for col, cal in map.items()]
+
     state.context = TABLE
     tokens = ["UPDATE ", build_tables(compile, update.table,
                                       update.default_table, state),

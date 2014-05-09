@@ -88,7 +88,7 @@ class ZStormResourceManager(TestResourceManager):
             # compatibility. This should be eventually dropped.
             if isinstance(databases, dict):
                 databases = [{"name": name, "uri": uri, "schema": schema}
-                             for name, (uri, schema) in databases.iteritems()]
+                             for name, (uri, schema) in databases.items()]
 
             # Provide the global IZStorm utility before applying patches, so
             # patch code can get the ztorm object if needed (e.g. looking up

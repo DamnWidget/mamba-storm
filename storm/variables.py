@@ -18,9 +18,16 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# Python 3 compatibility layer
+import six
+
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import re
 try:
     import uuid
@@ -30,6 +37,9 @@ except ImportError:
 from storm.compat import json
 from storm.exceptions import NoneError
 from storm import Undef, has_cextensions
+
+if six.PY3:
+    unicode = str
 
 
 __all__ = [
@@ -329,7 +339,7 @@ class BoolVariable(Variable):
     __slots__ = ()
 
     def parse_set(self, value, from_db):
-        if not isinstance(value, (int, long, float, Decimal)):
+        if not isinstance(value, (int, float, Decimal)):
             raise TypeError("Expected bool, found %r: %r"
                             % (type(value), value))
         return bool(value)
@@ -339,7 +349,7 @@ class IntVariable(Variable):
     __slots__ = ()
 
     def parse_set(self, value, from_db):
-        if not isinstance(value, (int, long, float, Decimal)):
+        if not isinstance(value, (int, float, Decimal)):
             raise TypeError("Expected int, found %r: %r"
                             % (type(value), value))
         return int(value)
@@ -349,7 +359,7 @@ class FloatVariable(Variable):
     __slots__ = ()
 
     def parse_set(self, value, from_db):
-        if not isinstance(value, (int, long, float, Decimal)):
+        if not isinstance(value, (int, float, Decimal)):
             raise TypeError("Expected float, found %r: %r"
                             % (type(value), value))
         return float(value)
@@ -361,7 +371,7 @@ class DecimalVariable(Variable):
     @staticmethod
     def parse_set(value, from_db):
         if (from_db and isinstance(value, basestring) or
-            isinstance(value, (int, long))):
+            isinstance(value, six.integer_types)):
             value = Decimal(value)
         elif not isinstance(value, Decimal):
             raise TypeError("Expected Decimal, found %r: %r"
@@ -422,7 +432,7 @@ class DateTimeVariable(Variable):
                 else:
                     value = value.astimezone(self._tzinfo)
         else:
-            if type(value) in (int, long, float):
+            if type(value) in (int, float):
                 value = datetime.utcfromtimestamp(value)
             elif not isinstance(value, datetime):
                 raise TypeError("Expected datetime, found %s" % repr(value))

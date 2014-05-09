@@ -85,7 +85,7 @@ class Transactor(object):
                 result = function(*args, **kwargs)
                 if auto_commit:
                     self._transaction.commit()
-            except RETRIABLE_ERRORS, error:
+            except RETRIABLE_ERRORS as error:
                 if isinstance(error, DisconnectionError):
                     # If we got a disconnection, calling rollback may not be
                     # enough because psycopg2 doesn't necessarily use the

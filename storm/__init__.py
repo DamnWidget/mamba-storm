@@ -21,7 +21,6 @@
 
 import os
 
-
 # Use a 4-digit version for development versions with 99 as the final version.
 # For example, if 0.15 is the currently released version of Storm, the
 # development version should be version 0.15.0.99.  This will make it obvious
@@ -53,6 +52,6 @@ if os.environ.get("STORM_CEXTENSIONS") != "0":
     try:
         from storm import cextensions
         has_cextensions = True
-    except ImportError, e:
+    except ImportError as e:
         if "cextensions" not in str(e):
-           raise
+            raise

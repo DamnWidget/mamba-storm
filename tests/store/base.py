@@ -20,12 +20,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from cStringIO import StringIO
-import decimal
 import gc
+import weakref
+import decimal
 import operator
 from uuid import uuid4
-import weakref
+from io import StringIO
 
 from storm.references import Reference, ReferenceSet, Proxy
 from storm.database import Result, STATE_DISCONNECTED
@@ -54,6 +54,7 @@ class Foo(object):
     id = Int(primary=True)
     title = Unicode()
 
+
 class Bar(object):
     __storm_table__ = "bar"
     id = Int(primary=True)
@@ -61,22 +62,27 @@ class Bar(object):
     foo_id = Int()
     foo = Reference(foo_id, Foo.id)
 
+
 class UniqueID(object):
     __storm_table__ = "unique_id"
     id = UUID(primary=True)
+
     def __init__(self, id):
         self.id = id
+
 
 class Blob(object):
     __storm_table__ = "bin"
     id = Int(primary=True)
     bin = RawStr()
 
+
 class Link(object):
     __storm_table__ = "link"
     __storm_primary__ = "foo_id", "bar_id"
     foo_id = Int()
     bar_id = Int()
+
 
 class SelfRef(object):
     __storm_table__ = "selfref"
@@ -86,24 +92,31 @@ class SelfRef(object):
     selfref = Reference(selfref_id, id)
     selfref_on_remote = Reference(id, selfref_id, on_remote=True)
 
+
 class FooRef(Foo):
     bar = Reference(Foo.id, Bar.foo_id)
+
 
 class FooRefSet(Foo):
     bars = ReferenceSet(Foo.id, Bar.foo_id)
 
+
 class FooRefSetOrderID(Foo):
     bars = ReferenceSet(Foo.id, Bar.foo_id, order_by=Bar.id)
+
 
 class FooRefSetOrderTitle(Foo):
     bars = ReferenceSet(Foo.id, Bar.foo_id, order_by=Bar.title)
 
+
 class FooIndRefSet(Foo):
     bars = ReferenceSet(Foo.id, Link.foo_id, Link.bar_id, Bar.id)
+
 
 class FooIndRefSetOrderID(Foo):
     bars = ReferenceSet(Foo.id, Link.foo_id, Link.bar_id, Bar.id,
                         order_by=Bar.id)
+
 
 class FooIndRefSetOrderTitle(Foo):
     bars = ReferenceSet(Foo.id, Link.foo_id, Link.bar_id, Bar.id,
@@ -117,6 +130,7 @@ class FooValue(object):
     value1 = Int()
     value2 = Int()
 
+
 class BarProxy(object):
     __storm_table__ = "bar"
     id = Int(primary=True)
@@ -124,6 +138,7 @@ class BarProxy(object):
     foo_id = Int()
     foo = Reference(foo_id, Foo.id)
     foo_title = Proxy(foo, Foo.title)
+
 
 class Money(object):
     __storm_table__ = "money"
@@ -212,14 +227,20 @@ class StoreTest(object):
         connection.execute("INSERT INTO bin (id, bin) VALUES (10, 'Blob 30')")
         connection.execute("INSERT INTO bin (id, bin) VALUES (20, 'Blob 20')")
         connection.execute("INSERT INTO bin (id, bin) VALUES (30, 'Blob 10')")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (10, 100)")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (10, 200)")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (10, 300)")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (20, 100)")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (20, 200)")
-        connection.execute("INSERT INTO link (foo_id, bar_id) VALUES (30, 300)")
-        connection.execute("INSERT INTO money (id, value)"
-                           " VALUES (10, '12.3455')")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (10, 100)")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (10, 200)")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (10, 300)")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (20, 100)")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (20, 200)")
+        connection.execute(
+            "INSERT INTO link (foo_id, bar_id) VALUES (30, 300)")
+        connection.execute(
+            "INSERT INTO money (id, value) VALUES (10, '12.3455')")
         connection.execute("INSERT INTO selfref (id, title, selfref_id)"
                            " VALUES (15, 'SelfRef 15', NULL)")
         connection.execute("INSERT INTO selfref (id, title, selfref_id)"
@@ -335,6 +356,7 @@ class StoreTest(object):
 
     def test_wb_get_cached_doesnt_need_connection(self):
         foo = self.store.get(Foo, 10)
+        assert foo
         connection = self.store._connection
         self.store._connection = None
         self.store.get(Foo, 10)
@@ -1491,8 +1513,8 @@ class StoreTest(object):
         result1 = self.store.find(Foo.title, Foo.id == 10)
         result2 = self.store.find(Foo.title, Foo.id != 10)
         result = result1.union(result2)
-        self.assertEquals(sorted(result),
-                          [u"Title 10", u"Title 20", u"Title 30",])
+        self.assertEquals(
+            sorted(result), [u"Title 10", u"Title 20", u"Title 30",])
 
     def test_find_with_expr_union_mismatch(self):
         result1 = self.store.find(Foo.title)
@@ -1552,7 +1574,7 @@ class StoreTest(object):
         result.group_by(FooValue.value2)
         result.order_by(Count(FooValue.id), Sum(FooValue.value1))
         result = list(result)
-        self.assertEquals(result, [(2L, 2L), (2L, 2L), (2L, 3L), (3L, 6L)])
+        self.assertEquals(result, [(2, 2), (2, 2), (2, 3), (3, 6)])
 
     def test_find_group_by_table(self):
         result = self.store.find(
@@ -5920,10 +5942,12 @@ class StoreTest(object):
             self.store.commit()
             try:
                 self.assertEquals(myfoo.title, title)
-            except AssertionError, e:
-                raise AssertionError(unicode(e, 'replace') +
+            except AssertionError as e:
+                raise AssertionError(
+                    unicode(e, 'replace') +
                     " (ensure your database was created with CREATE DATABASE"
-                    " ... CHARACTER SET utf8)")
+                    " ... CHARACTER SET utf8)"
+                )
 
     def test_creation_order_is_preserved_when_possible(self):
         foos = [self.store.add(Foo()) for i in range(10)]
@@ -5934,6 +5958,7 @@ class StoreTest(object):
     def test_update_order_is_preserved_when_possible(self):
         class MyFoo(Foo):
             sequence = 0
+
             def __storm_flushed__(self):
                 self.flush_order = MyFoo.sequence
                 MyFoo.sequence += 1
@@ -5952,6 +5977,7 @@ class StoreTest(object):
     def test_removal_order_is_preserved_when_possible(self):
         class MyFoo(Foo):
             sequence = 0
+
             def __storm_flushed__(self):
                 self.flush_order = MyFoo.sequence
                 MyFoo.sequence += 1
@@ -5991,6 +6017,7 @@ class StoreTest(object):
     def test_execute_sends_event(self):
         """Statement execution emits the register-transaction event."""
         calls = []
+
         def register_transaction(owner):
             calls.append(owner)
         self.store._event.hook("register-transaction", register_transaction)
@@ -6004,6 +6031,7 @@ class StoreTest(object):
         the connection.
         """
         calls = []
+
         def register_transaction(owner):
             calls.append(owner)
         self.store._event.hook("register-transaction", register_transaction)
@@ -6015,6 +6043,7 @@ class StoreTest(object):
     def test_add_sends_event(self):
         """Adding an object emits the register-transaction event."""
         calls = []
+
         def register_transaction(owner):
             calls.append(owner)
         self.store._event.hook("register-transaction", register_transaction)
@@ -6027,6 +6056,7 @@ class StoreTest(object):
     def test_remove_sends_event(self):
         """Adding an object emits the register-transaction event."""
         calls = []
+
         def register_transaction(owner):
             calls.append(owner)
         self.store._event.hook("register-transaction", register_transaction)
@@ -6041,6 +6071,7 @@ class StoreTest(object):
         """Modifying an object retrieved in a previous transaction emits the
         register-transaction event."""
         calls = []
+
         def register_transaction(owner):
             calls.append(owner)
         self.store._event.hook("register-transaction", register_transaction)

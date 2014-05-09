@@ -1,3 +1,14 @@
+
+# Copyright (c) 2014 Oscar Campos <oscar.campos@member.fsf.org>
+# See LICENSE for more details
+
+"""
+.. module:: store
+    :synopsis: Storm store
+
+.. moduleauthor:: Oscar Campos <oscar.campos@member.fsf.org>
+"""
+
 #
 # Copyright (c) 2006, 2007 Canonical
 #
@@ -23,6 +34,9 @@
 
 This module contains the highest-level ORM interface in Storm.
 """
+
+# Python 3 compatibility layer
+import six
 
 from copy import copy
 from weakref import WeakValueDictionary
@@ -393,7 +407,10 @@ class Store(object):
             cls_info = obj_info.cls_info
             for column in cls_info.columns:
                 if id(column) not in cls_info.primary_key_idx:
-                    obj_info.variables[column].set(AutoReload)
+                    if six.PY2:
+                        obj_info.variables[column].set(AutoReload)
+                    else:
+                        obj_info.variables[id(column)].set(AutoReload)
             if invalidate:
                 # Marking an object with 'invalidated' means that we're
                 # not sure if the object is actually in the database
@@ -469,7 +486,7 @@ class Store(object):
         self._dirty = flushing
 
         predecessors = {}
-        for (before_info, after_info), n in self._order.iteritems():
+        for (before_info, after_info), n in six.iteritems(self._order):
             if n > 0:
                 before_set = predecessors.get(after_info)
                 if before_set is None:
@@ -491,9 +508,9 @@ class Store(object):
                 for i, obj_info in enumerate(sorted_dirty):
                     for before_info in predecessors.get(obj_info, ()):
                         if before_info in self._dirty:
-                            break # A predecessor is still dirty.
+                            break  # A predecessor is still dirty.
                     else:
-                        break # Found an item without dirty predecessors.
+                        break  # Found an item without dirty predecessors.
                 else:
                     raise OrderLoopError("Can't flush due to ordering loop")
                 del sorted_dirty[i]
@@ -593,18 +610,31 @@ class Store(object):
         changes = {}
         select_variables = []
         for column in cls_info.columns:
-            variable = obj_info.variables[column]
+            if six.PY2:
+                variable = obj_info.variables[column]
+            else:
+                variable = obj_info.variables[id(column)]
             if adding or variable.has_changed():
                 if variable.is_defined():
-                    changes[column] = variable
+                    if six.PY2:
+                        changes[column] = variable
+                    else:
+                        changes[id(column)] = variable
                 else:
                     lazy_value = variable.get_lazy()
                     if isinstance(lazy_value, Expr):
-                        if id(column) in cls_info.primary_key_idx:
-                            select_variables.append(variable) # See below.
-                            changes[column] = variable
+                        if six.PY2:
+                            if id(column) in cls_info.primary_key_idx:
+                                select_variables.append(variable)  # See below.
+                                changes[column] = variable
+                            else:
+                                changes[column] = lazy_value
                         else:
-                            changes[column] = lazy_value
+                            if id(column) in cls_info.primary_key_idx:
+                                select_variables.append(variable)
+                                changes[id(column)] = variable
+                            else:
+                                changes[id(column)] = lazy_value
 
         # If we have any expressions in the primary variables, we
         # have to resolve them now so that we have the identity of
@@ -640,7 +670,10 @@ class Store(object):
         primary_key_idx = cls_info.primary_key_idx
         missing_columns = []
         for column in cls_info.columns:
-            variable = obj_info.variables[column]
+            if six.PY2:
+                variable = obj_info.variables[column]
+            else:
+                    variable = obj_info.variables[id(column)]
             if not variable.is_defined():
                 idx = primary_key_idx.get(id(column))
                 if idx is not None:
@@ -763,7 +796,10 @@ class Store(object):
                                   "(object got removed?)")
         obj_info.pop("invalidated", None)
         for column, value in zip(columns, values):
-            variable = obj_info.variables[column]
+            if six.PY2:
+                variable = obj_info.variables[column]
+            else:
+                variable = obj_info.variables[id(column)]
             lazy_value = variable.get_lazy()
             is_unknown_lazy = not (lazy_value is None or
                                    lazy_value is AutoReload)
@@ -900,8 +936,12 @@ class Store(object):
 
         autoreload_columns = []
         for column in obj_info.cls_info.columns:
-            if obj_info.variables[column].get_lazy() is AutoReload:
-                autoreload_columns.append(column)
+            if six.PY2:
+                if obj_info.variables[column].get_lazy() is AutoReload:
+                    autoreload_columns.append(column)
+            else:
+                if obj_info.variables[id(column)].get_lazy() is AutoReload:
+                    autoreload_columns.append(column)
 
         if autoreload_columns:
             where = compare_columns(obj_info.cls_info.primary_key,
@@ -1002,7 +1042,7 @@ class ResultSet(object):
             L{ResultSet} will be returned appropriately modified with
             C{OFFSET} and C{LIMIT} clauses.
         """
-        if isinstance(index, (int, long)):
+        if isinstance(index, int):
             if index == 0:
                 result_set = self
             else:
@@ -1379,11 +1419,20 @@ class ResultSet(object):
         for key, value in kwargs.items():
             column = getattr(cls, key)
             if value is None:
-                changes[column] = None
+                if six.PY2:
+                    changes[column] = None
+                else:
+                    changes[id(column)] = None
             elif isinstance(value, Expr):
-                changes[column] = value
+                if six.PY2:
+                    changes[column] = value
+                else:
+                    changes[id(column)] = value
             else:
-                changes[column] = column.variable_factory(value=value)
+                if six.PY2:
+                    changes[column] = column.variable_factory(value=value)
+                else:
+                    changes[id(column)] = column.variable_factory(value=value)
 
         expr = Update(changes, self._where,
                       self._find_spec.default_cls_info.table)
@@ -1399,11 +1448,15 @@ class ResultSet(object):
             for obj_info in self._store._iter_alive():
                 if obj_info.cls_info is self._find_spec.default_cls_info:
                     for column in changes:
-                        obj_info.variables[column].set(AutoReload)
+                        if six.PY2:
+                            obj_info.variables[column].set(AutoReload)
+                        else:
+                            obj_info.variables[id(column)].set(AutoReload)
         else:
             changes = changes.items()
             for obj in cached:
                 for column, value in changes:
+                    print(column, value)
                     variables = get_obj_info(obj).variables
                     if value is None:
                         pass
@@ -1417,6 +1470,7 @@ class ResultSet(object):
                         value = AutoReload
                     else:
                         value = variables[value].get()
+
                     variables[column].set(value)
                     variables[column].checkpoint()
 
@@ -1433,7 +1487,9 @@ class ResultSet(object):
             match = compile_python.get_matcher(self._where)
 
             def get_column(column):
-                return obj_info.variables[column].get()
+                if six.PY2:
+                    return obj_info.variables[column].get()
+                return obj_info.variables[id(column)].get()
 
         objects = []
         for obj_info in self._store._iter_alive():

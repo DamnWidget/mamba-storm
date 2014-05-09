@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 import sys
-import new
+import types
 import gc
 
 from storm.exceptions import ClosedError, DatabaseError, DisconnectionError
@@ -517,7 +517,7 @@ class CreateDatabaseTest(TestHelper):
 
     def setUp(self):
         TestHelper.setUp(self)
-        self.db_module = new.module("db_module")
+        self.db_module = types.ModuleType("db_module")
         self.uri = None
         def create_from_uri(uri):
             self.uri = uri

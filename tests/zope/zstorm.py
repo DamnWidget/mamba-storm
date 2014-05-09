@@ -18,9 +18,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import threading
-import weakref
 import gc
+import weakref
+import threading
 
 from tests.helper import TestHelper
 from tests.zope import has_transaction, has_zope_component
@@ -33,8 +33,8 @@ if has_transaction:
 if has_zope_component:
     from zope.component import provideUtility, getUtility
 
-from storm.exceptions import OperationalError
 from storm.locals import Store
+from storm.exceptions import OperationalError
 
 
 class ZStormTest(TestHelper):
@@ -68,6 +68,7 @@ class ZStormTest(TestHelper):
 
     def test_create_twice_same_name(self):
         store = self.zstorm.create("name", "sqlite:")
+        assert store
         self.assertRaises(ZStormError, self.zstorm.create, "name", "sqlite:")
 
     def test_create_and_get_named(self):
@@ -76,6 +77,7 @@ class ZStormTest(TestHelper):
 
     def test_create_and_get_named_another_thread(self):
         store = self.zstorm.create("name", "sqlite:")
+        assert store
 
         raised = []
 
@@ -347,6 +349,7 @@ class ZStormTest(TestHelper):
         store = self.zstorm.get("name", "sqlite:")
 
         failures = []
+
         def f():
             # We perform this twice to show that ZStormError is raised
             # consistently (i.e. not just the first time).
@@ -355,7 +358,7 @@ class ZStormTest(TestHelper):
                     store.execute("SELECT 1")
                 except ZStormError:
                     failures.append("ZStormError raised")
-                except Exception, exc:
+                except Exception as exc:
                     failures.append("Expected ZStormError, got %r" % exc)
                 else:
                     failures.append("Expected ZStormError, nothing raised")
@@ -370,6 +373,7 @@ class ZStormTest(TestHelper):
         """_reset is used to reset the zstorm utility between zope test runs.
         """
         store = self.zstorm.get("name", "sqlite:")
+        assert store
         self.zstorm._reset()
         self.assertEqual(list(self.zstorm.iterstores()), [])
 
@@ -396,4 +400,3 @@ class ZStormUtilityTest(TestHelper):
     def test_utility(self):
         provideUtility(ZStorm())
         self.assertTrue(isinstance(getUtility(IZStorm), ZStorm))
-

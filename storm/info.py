@@ -20,6 +20,9 @@
 #
 from weakref import ref
 
+# Python 3 compatibility layer
+import six
+
 from storm.exceptions import ClassInfoError
 from storm.expr import Column, Desc, TABLE
 from storm.expr import compile, Table
@@ -73,7 +76,7 @@ class ClassInfo(dict):
 
         self.cls = cls
 
-        if isinstance(self.table, basestring):
+        if isinstance(self.table, six.string_types):
             self.table = Table(self.table)
 
         pairs = []
@@ -168,13 +171,29 @@ class ObjectInfo(dict):
         self.variables = variables = {}
 
         for column in self.cls_info.columns:
-            variables[column] = \
-                column.variable_factory(column=column,
-                                        event=event,
-                                        validator_object_factory=self.get_obj)
+            if six.PY2:
+                variables[column] = (
+                    column.variable_factory(
+                        column=column,
+                        event=event,
+                        validator_object_factory=self.get_obj)
+                )
+            else:
+                variables[id(column)] = (
+                    column.variable_factory(
+                        column=column,
+                        event=event,
+                        validator_object_factory=self.get_obj)
+                )
 
-        self.primary_vars = tuple(variables[column]
-                                  for column in self.cls_info.primary_key)
+        if six.PY2:
+            self.primary_vars = tuple(
+                variables[column] for column in self.cls_info.primary_key
+            )
+        else:
+            self.primary_vars = tuple(
+                variables[id(column)] for column in self.cls_info.primary_key
+            )
 
     def __eq__(self, other):
         return self is other

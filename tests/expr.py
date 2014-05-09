@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+import six
 from decimal import Decimal
 
 from tests.helper import TestHelper
@@ -35,9 +36,10 @@ class Func2(NamedFunc):
 # Create columnN, tableN, and elemN variables.
 for i in range(10):
     for name in ["column", "elem"]:
-        exec "%s%d = SQLToken('%s%d')" % (name, i, name, i)
+        six.exec_("%s%d = SQLToken('%s%d')" % (name, i, name, i))
     for name in ["table"]:
-        exec "%s%d = '%s %d'" % (name, i, name, i)
+        six.exec_("%s%d = '%s %d'" % (name, i, name, i))
+
 
 
 class TrackContext(FromExpr):
@@ -495,7 +497,7 @@ class CompileTest(TestHelper):
 
     def test_precedence(self):
         for i in range(10):
-            exec "e%d = SQLRaw('%d')" % (i, i)
+            six.exec_("e%d = SQLRaw('%d')" % (i, i))
         expr = And(e1, Or(e2, e3),
                    Add(e4, Mul(e5, Sub(e6, Div(e7, Div(e8, e9))))))
         statement = compile(expr)
@@ -586,7 +588,7 @@ class CompileTest(TestHelper):
 
     def test_long(self):
         state = State()
-        statement = compile(1L, state)
+        statement = compile(1, state)
         self.assertEquals(statement, "?")
         self.assertVariablesEqual(state.parameters, [IntVariable(1)])
 
@@ -2130,7 +2132,7 @@ class CompilePythonTest(TestHelper):
 
     def test_precedence(self):
         for i in range(10):
-            exec "e%d = SQLRaw('%d')" % (i, i)
+            six.exec_("e%d = SQLRaw('%d')" % (i, i))
         expr = And(e1, Or(e2, e3),
                    Add(e4, Mul(e5, Sub(e6, Div(e7, Div(e8, e9))))))
         py_expr = compile_python(expr)
@@ -2172,8 +2174,8 @@ class CompilePythonTest(TestHelper):
         self.assertEquals(py_expr, "1")
 
     def test_long(self):
-        py_expr = compile_python(1L)
-        self.assertEquals(py_expr, "1L")
+        py_expr = compile_python(1)
+        self.assertEquals(py_expr, "1")
 
     def test_bool(self):
         state = State()

@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+import six
 import weakref
 
 from storm.exceptions import (
@@ -541,15 +542,21 @@ class Relation(object):
 
     def get_local_variables(self, local):
         local_info = get_obj_info(local)
-        return tuple(local_info.variables[column]
+        if six.PY2:
+            return tuple(local_info.variables[column]
+                     for column in self._get_local_columns(local.__class__))
+        return tuple(local_info.variables[id(column)]
                      for column in self._get_local_columns(local.__class__))
 
     def local_variables_are_none(self, local):
         """Return true if all variables of the local key have None values."""
         local_info = get_obj_info(local)
         for column in self._get_local_columns(local.__class__):
-            if local_info.variables[column].get() is not None:
-                return False
+            if six.PY2:
+                if local_info.variables[column].get() is not None:
+                    return False
+            if local_info.variables[id(column)].get() is not None:
+                    return False
         return True
 
     def get_remote_variables(self, remote):
@@ -626,11 +633,19 @@ class Relation(object):
             if self.on_remote:
                 local_has_changed = False
                 for local_column, remote_column in pairs:
-                    local_var = local_vars[local_column]
-                    if not local_var.is_defined():
-                        remote_vars[remote_column].set(PendingReferenceValue)
+                    if six.PY2:
+                        local_var = local_vars[local_column]
+                        if not local_var.is_defined():
+                            remote_vars[remote_column].set(PendingReferenceValue)
+                        else:
+                            remote_vars[remote_column].set(local_var.get())
                     else:
-                        remote_vars[remote_column].set(local_var.get())
+                        local_var = local_vars[id(local_column)]
+                        if not local_var.is_defined():
+                            remote_vars[id(remote_column)].set(PendingReferenceValue)
+                        else:
+                            remote_vars[id(remote_column)].set(local_var.get())
+
                     if local_var.has_changed():
                         local_has_changed = True
 
@@ -648,11 +663,19 @@ class Relation(object):
             else:
                 remote_has_changed = False
                 for local_column, remote_column in pairs:
-                    remote_var = remote_vars[remote_column]
-                    if not remote_var.is_defined():
-                        local_vars[local_column].set(PendingReferenceValue)
+                    if six.PY2:
+                        remote_var = remote_vars[remote_column]
+                        if not remote_var.is_defined():
+                            local_vars[local_column].set(PendingReferenceValue)
+                        else:
+                            local_vars[local_column].set(remote_var.get())
                     else:
-                        local_vars[local_column].set(remote_var.get())
+                        remote_var = remote_vars[id(remote_column)]
+                        if not remote_var.is_defined():
+                            local_vars[id(local_column)].set(PendingReferenceValue)
+                        else:
+                            local_vars[id(local_column)].set(remote_var.get())
+
                     if remote_var.has_changed():
                         remote_has_changed = True
 
@@ -772,7 +795,10 @@ class Relation(object):
         remote_column = self._get_remote_column(local_info.cls_info.cls,
                                                 local_variable.column)
         if remote_column is not None:
-            remote_info.variables[remote_column].set(new_value)
+            if six.PY2:
+                remote_info.variables[remote_column].set(new_value)
+            else:
+                remote_info.variables[id(remote_column)].set(new_value)
             self._add_flush_order(local_info, remote_info)
 
     def _track_remote_changes(self, remote_info, remote_variable,
@@ -786,7 +812,10 @@ class Relation(object):
         local_column = self._get_local_column(local_info.cls_info.cls,
                                               remote_variable.column)
         if local_column is not None:
-            local_info.variables[local_column].set(new_value)
+            if six.PY2:
+                local_info.variables[local_column].set(new_value)
+            else:
+                local_info.variables[id(local_column)].set(new_value)
             self._add_flush_order(local_info, remote_info, remote_first=True)
 
     def _break_on_local_diverged(self, local_info, local_variable,
@@ -800,7 +829,10 @@ class Relation(object):
         remote_column = self._get_remote_column(local_info.cls_info.cls,
                                                 local_variable.column)
         if remote_column is not None:
-            variable = remote_info.variables[remote_column]
+            if six.PY2:
+                variable = remote_info.variables[remote_column]
+            else:
+                variable = remote_info.variables[id(remote_column)]
             if variable.get_lazy() is None and variable.get() != new_value:
                 self.unlink(local_info, remote_info)
 
@@ -873,23 +905,38 @@ class Relation(object):
 
     def _get_remote_column(self, local_cls, local_column):
         try:
-            return self._l_to_r[local_cls].get(local_column)
+            if six.PY2:
+                return self._l_to_r[local_cls].get(local_column)
+            else:
+                return self._l_to_r[id(local_cls)].get(local_column)
         except KeyError:
             map = {}
             for local_prop, _remote_column in zip(self.local_key,
                                                   self.remote_key):
-                map[local_prop.__get__(None, local_cls)] = _remote_column
-            return self._l_to_r.setdefault(local_cls, map).get(local_column)
+                if six.PY2:
+                    map[local_prop.__get__(None, local_cls)] = _remote_column
+                else:
+                    map[id(local_prop.__get__(None, local_cls))] = _remote_column
+            if six.PY2:
+                return self._l_to_r.setdefault(local_cls, map).get(local_column)
+            return self._l_to_r.setdefault(local_cls, map).get(id(local_column))
 
     def _get_local_column(self, local_cls, remote_column):
         try:
-            return self._r_to_l[local_cls].get(remote_column)
+            if six.PY2:
+                return self._r_to_l[local_cls].get(remote_column)
+            return self._r_to_l[local_cls].get(id(remote_column))
         except KeyError:
             map = {}
             for local_prop, _remote_column in zip(self.local_key,
                                                    self.remote_key):
-                map[_remote_column] = local_prop.__get__(None, local_cls)
-            return self._r_to_l.setdefault(local_cls, map).get(remote_column)
+                if six.PY2:
+                    map[_remote_column] = local_prop.__get__(None, local_cls)
+                else:
+                    map[id(_remote_column)] = local_prop.__get__(None, local_cls)
+            if six.PY2:
+                return self._r_to_l.setdefault(local_cls, map).get(remote_column)
+            return self._r_to_l.setdefault(local_cls, map).get(id(remote_column))
 
 
 class PropertyResolver(object):
@@ -910,7 +957,7 @@ class PropertyResolver(object):
     def resolve_one(self, property):
         if type(property) is tuple:
             return self.resolve(property)
-        elif isinstance(property, basestring):
+        elif isinstance(property, six.string_types):
             return self._resolve_string(property)
         elif isinstance(property, SuffixExpr):
             # XXX This covers cases like order_by=Desc("Bar.id"), see #620369.
@@ -938,14 +985,14 @@ class PropertyResolver(object):
 
 def _find_descriptor_class(used_cls, descr):
     for cls in used_cls.__mro__:
-        for attr, _descr in cls.__dict__.iteritems():
+        for attr, _descr in six.iteritems(cls.__dict__):
             if _descr is descr:
                 return cls
     raise RuntimeError("Reference used in an unknown class")
 
 def _find_descriptor_obj(used_cls, descr):
     for cls in used_cls.__mro__:
-        for attr, _descr in cls.__dict__.iteritems():
+        for attr, _descr in six.iteritems(cls.__dict__):
             if _descr is descr:
                 return getattr(cls, attr)
     raise RuntimeError("Reference used in an unknown class")

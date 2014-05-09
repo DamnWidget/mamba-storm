@@ -124,10 +124,10 @@ class PatchApplier(object):
         except:
             type, value, traceback = sys.exc_info()
             patch_repr = getattr(module, "__file__", version)
-            raise BadPatchError, \
+            raise BadPatchError(
                   "Patch %s failed: %s: %s" % \
                       (patch_repr, type.__name__, str(value)), \
-                      traceback
+                      traceback)
         self._committer.commit()
 
     def apply_all(self):

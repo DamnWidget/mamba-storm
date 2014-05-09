@@ -34,15 +34,18 @@ class Lst1(object):
     id = Int(primary=True)
     ints = List(type=Int())
 
+
 class LstEnum(object):
     __storm_table__ = "lst1"
     id = Int(primary=True)
     ints = List(type=Enum(map={"one": 1, "two": 2, "three": 3}))
 
+
 class Lst2(object):
     __storm_table__ = "lst2"
     id = Int(primary=True)
     ints = List(type=List(type=Int()))
+
 
 class FooWithSchema(Foo):
     __storm_table__ = "public.foo"

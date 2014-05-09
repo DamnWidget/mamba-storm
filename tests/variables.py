@@ -18,19 +18,19 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime, date, time, timedelta
-from decimal import Decimal
-import cPickle as pickle
 import gc
+import pickle
 import weakref
 try:
     import uuid
 except ImportError:
     uuid = None
-
+from decimal import Decimal
 from storm.compat import json
-from storm.exceptions import NoneError
 from storm.variables import *
+from storm.exceptions import NoneError
+from datetime import datetime, date, time, timedelta
+
 from storm.event import EventSystem
 from storm.expr import Column, SQLToken
 from storm.tz import tzutc, tzoffset
@@ -72,11 +72,11 @@ class VariableTest(TestHelper):
         self.assertEquals(variable.sets, [(marker, True)])
 
     def test_constructor_value_factory(self):
-        variable = CustomVariable(value_factory=lambda:marker)
+        variable = CustomVariable(value_factory=lambda: marker)
         self.assertEquals(variable.sets, [(marker, False)])
 
     def test_constructor_value_factory_from_db(self):
-        variable = CustomVariable(value_factory=lambda:marker, from_db=True)
+        variable = CustomVariable(value_factory=lambda: marker, from_db=True)
         self.assertEquals(variable.sets, [(marker, True)])
 
     def test_constructor_column(self):
@@ -143,7 +143,7 @@ class VariableTest(TestHelper):
         variable = CustomVariable(allow_none=False, column=column)
         try:
             variable.set(None)
-        except NoneError, e:
+        except NoneError as e:
             pass
         self.assertTrue("column_name" in str(e))
 
@@ -152,12 +152,13 @@ class VariableTest(TestHelper):
         variable = CustomVariable(allow_none=False, column=column)
         try:
             variable.set(None)
-        except NoneError, e:
+        except NoneError as e:
             pass
         self.assertTrue("table_name.column_name" in str(e))
 
     def test_set_with_validator(self):
         args = []
+
         def validator(obj, attr, value):
             args.append((obj, attr, value))
             return value
@@ -167,6 +168,7 @@ class VariableTest(TestHelper):
 
     def test_set_with_validator_and_validator_arguments(self):
         args = []
+
         def validator(obj, attr, value):
             args.append((obj, attr, value))
             return value
@@ -178,6 +180,7 @@ class VariableTest(TestHelper):
 
     def test_set_with_validator_raising_error(self):
         args = []
+
         def validator(obj, attr, value):
             args.append((obj, attr, value))
             raise ZeroDivisionError()
@@ -188,6 +191,7 @@ class VariableTest(TestHelper):
 
     def test_set_with_validator_changing_value(self):
         args = []
+
         def validator(obj, attr, value):
             args.append((obj, attr, value))
             return 42
@@ -198,6 +202,7 @@ class VariableTest(TestHelper):
 
     def test_set_from_db_wont_call_validator(self):
         args = []
+
         def validator(obj, attr, value):
             args.append((obj, attr, value))
             return 42
@@ -210,6 +215,7 @@ class VariableTest(TestHelper):
         event = EventSystem(marker)
 
         changed_values = []
+
         def changed(owner, variable, old_value, new_value, fromdb):
             changed_values.append((owner, variable,
                                    old_value, new_value, fromdb))
@@ -225,19 +231,27 @@ class VariableTest(TestHelper):
         variable.delete()
         variable.delete()
 
-        self.assertEquals(changed_values[0],
-          (marker, variable, Undef, "value1", False))
-        self.assertEquals(changed_values[1],
-          (marker, variable, ("g", ("s", "value1")), "value2", False))
-        self.assertEquals(changed_values[2],
-          (marker, variable, ("g", ("s", "value2")), ("g", ("s", "value3")),
-           True))
-        self.assertEquals(changed_values[3],
-          (marker, variable, ("g", ("s", "value3")), None, True))
-        self.assertEquals(changed_values[4],
-          (marker, variable, None, "value4", False))
-        self.assertEquals(changed_values[5],
-          (marker, variable, ("g", ("s", "value4")), Undef, False))
+        self.assertEquals(
+            changed_values[0], (marker, variable, Undef, "value1", False))
+        self.assertEquals(
+            changed_values[1],
+            (marker, variable, ("g", ("s", "value1")), "value2", False)
+        )
+        self.assertEquals(
+            changed_values[2],
+            (marker, variable,
+                ("g", ("s", "value2")), ("g", ("s", "value3")), True)
+        )
+        self.assertEquals(
+            changed_values[3],
+            (marker, variable, ("g", ("s", "value3")), None, True)
+        )
+        self.assertEquals(
+            changed_values[4], (marker, variable, None, "value4", False))
+        self.assertEquals(
+            changed_values[5],
+            (marker, variable, ("g", ("s", "value4")), Undef, False)
+        )
         self.assertEquals(len(changed_values), 6)
 
     def test_get_state(self):
@@ -298,10 +312,9 @@ class VariableTest(TestHelper):
         event = EventSystem(marker)
 
         resolve_values = []
+
         def resolve(owner, variable, value):
             resolve_values.append((owner, variable, value))
-
-
 
         lazy_value = LazyValue()
         variable = CustomVariable(lazy_value, event=event)
@@ -317,6 +330,7 @@ class VariableTest(TestHelper):
         event = EventSystem(marker)
 
         changed_values = []
+
         def changed(owner, variable, old_value, new_value, fromdb):
             changed_values.append((owner, variable,
                                    old_value, new_value, fromdb))
@@ -349,6 +363,7 @@ class VariableTest(TestHelper):
         event = EventSystem(marker)
 
         resolve_called = []
+
         def resolve(owner, variable, value):
             resolve_called.append(True)
 
@@ -467,7 +482,7 @@ class DateTimeVariableTest(TestHelper):
         self.assertEquals(variable.get(), epoch)
         variable.set(0.0)
         self.assertEquals(variable.get(), epoch)
-        variable.set(0L)
+        variable.set(0)
         self.assertEquals(variable.get(), epoch)
         variable.set(epoch)
         self.assertEquals(variable.get(), epoch)
@@ -769,7 +784,7 @@ class ParseIntervalTest(TestHelper):
     def test_unsupported_unit(self):
         try:
             self.check("1 month", None)
-        except ValueError, e:
+        except ValueError as e:
             self.assertEquals(str(e), "Unsupported interval unit 'month' "
                                       "in interval '1 month'")
         else:
@@ -778,7 +793,7 @@ class ParseIntervalTest(TestHelper):
     def test_missing_value(self):
         try:
             self.check("day", None)
-        except ValueError, e:
+        except ValueError as e:
             self.assertEquals(str(e), "Expected an interval value rather than "
                                       "'day' in interval 'day'")
         else:
@@ -860,6 +875,7 @@ class EncodedValueVariableTestMixin(object):
         variable = self.variable_type(event=event, value_factory=list)
 
         changes = []
+
         def changed(owner, variable, old_value, new_value, fromdb):
             changes.append((variable, old_value, new_value, fromdb))
 
@@ -959,6 +975,7 @@ class ListVariableTest(TestHelper):
                                 value_factory=list)
 
         changes = []
+
         def changed(owner, variable, old_value, new_value, fromdb):
             changes.append((variable, old_value, new_value, fromdb))
 

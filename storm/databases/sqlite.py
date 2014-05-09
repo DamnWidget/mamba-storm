@@ -18,6 +18,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+import six
+
 from datetime import datetime, date, time, timedelta
 from time import sleep, time as now
 import sys
@@ -95,10 +98,16 @@ class SQLiteResult(Result):
         to strings.
         """
         for value in row:
-            if isinstance(value, buffer):
-                yield str(value)
+            if six.PY2:
+                if isinstance(value, buffer):
+                    yield str(value)
+                else:
+                    yield value
             else:
-                yield value
+                if isinstance(value, memoryview):
+                    yield bytes(value)
+                else:
+                    yield value
 
 
 class SQLiteConnection(Connection):
@@ -119,7 +128,7 @@ class SQLiteConnection(Connection):
                 param = param.get(to_db=True)
             if isinstance(param, (datetime, date, time, timedelta)):
                 yield str(param)
-            elif isinstance(param, str):
+            elif six.PY2 and isinstance(param, str):  # PY3 is Unicode
                 yield buffer(param)
             else:
                 yield param
@@ -157,7 +166,7 @@ class SQLiteConnection(Connection):
         while True:
             try:
                 return Connection.raw_execute(self, statement, params)
-            except sqlite.OperationalError, e:
+            except sqlite.OperationalError as e:
                 if str(e) != "database is locked":
                     raise
                 elif now() - started < self._database._timeout:
@@ -209,16 +218,16 @@ create_from_uri = SQLite
 
 
 # Here is a sad story about PySQLite2.
-# 
+#
 # PySQLite does some very dirty tricks to control the moment in
 # which transactions begin and end.  It actually *changes* the
 # transactional behavior of SQLite.
-# 
+#
 # The real behavior of SQLite is that transactions are SERIALIZABLE
 # by default.  That is, any reads are repeatable, and changes in
 # other threads or processes won't modify data for already started
 # transactions that have issued any reading or writing statements.
-# 
+#
 # PySQLite changes that in a very unpredictable way.  First, it will
 # only actually begin a transaction if a INSERT/UPDATE/DELETE/REPLACE
 # operation is executed (yes, it will parse the statement).  This
@@ -226,19 +235,19 @@ create_from_uri = SQLite
 # operations are seen, will be operating in READ COMMITTED mode.  Then,
 # if after that a INSERT/UPDATE/DELETE/REPLACE is seen, the transaction
 # actually begins, and so it moves into SERIALIZABLE mode.
-# 
+#
 # Another pretty surprising behavior is that it will *commit* any
 # on-going transaction if any other statement besides
 # SELECT/INSERT/UPDATE/DELETE/REPLACE is seen.
-# 
+#
 # In an ORM we're really dealing with cached data, so working on top
 # of a system like that means that cache validity is pretty random.
-# 
+#
 # So what we do about that in this module is disabling all that hackery
 # by *pretending* to PySQLite that we'll work without transactions
 # (isolation_level=None), and then we actually take responsibility for
 # controlling the transaction.
-# 
+#
 # References:
 #     http://www.sqlite.org/lockingv3.html
 #     http://docs.python.org/lib/sqlite3-Controlling-Transactions.html

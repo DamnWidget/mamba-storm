@@ -169,10 +169,7 @@ class BaseStatementTracer(object):
             # string parameters which represent encoded binary data.
             render_params = []
             for param in query_params:
-                if isinstance(param, unicode):
-                    render_params.append(repr(param.encode('utf8')))
-                else:
-                    render_params.append(repr(param))
+                render_params.append(repr(param))
             try:
                 statement_to_log = quoted_statement % tuple(render_params)
             except TypeError:
